@@ -1,0 +1,22 @@
+-- My Query
+WITH user_tweet_counts AS 
+(SELECT user_id,
+        SUM(CASE WHEN YEAR(tweet_date) = 2022 THEN 1 ELSE 0 END) user_tweets
+FROM tweets
+GROUP BY user_id)
+
+SELECT user_tweets,
+       COUNT(user_id) AS user_bucket
+FROM user_tweet_counts
+GROUP BY user_tweets;
+
+-- Datalemur solution
+SELECT 
+  user_id, 
+  COUNT(tweet_id) AS tweet_count_per_user 
+FROM tweets 
+WHERE tweet_date BETWEEN '2022-01-01' 
+  AND '2022-12-31'
+GROUP BY user_id;
+
+-- Observation: I can condense my query by utilizing the WHERE statement
