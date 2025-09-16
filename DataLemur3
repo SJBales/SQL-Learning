@@ -1,0 +1,8 @@
+-- DataLemur Query
+SELECT candidate_id
+FROM candidates
+WHERE skill IN ('Python', 'Tableau', 'PostgreSQL')
+GROUP BY candidate_id
+HAVING COUNT(DISTINCT skill) = 3;
+
+-- Smart: select only the rows with the tools you want and "post filter" to retain those candidates with the three skills
