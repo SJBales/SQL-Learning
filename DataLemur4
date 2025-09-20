@@ -1,0 +1,16 @@
+-- My Query
+SELECT page_id
+FROM pages
+WHERE page_id NOT IN (SELECT DISTINCT page_id FROM page_likes)
+ORDER BY page_id;
+
+-- DataLemur Query
+SELECT page_id
+FROM pages
+EXCEPT
+SELECT page_id
+FROM page_likes
+WHERE page_id NOT NULL
+ORDER BY page_id;
+
+-- EXCEPT clause is new to me, but very useful in this instance where you need the "difference" between two tables
