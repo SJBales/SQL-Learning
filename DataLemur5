@@ -1,0 +1,31 @@
+-- My Query
+SELECT user_id,
+       spend,
+       transaction_date
+FROM (SELECT user_id,
+             spend,
+             transaction_date,
+             ROW_NUMBER() OVER(
+                  PARTITION BY user_id 
+                  ORDER BY transaction_date) transaction_num
+      FROM transactions) AS ordered_transactions
+WHERE transaction_num = 3;
+
+-- Data Lemur Query
+WITH trans_num AS (
+  SELECT 
+    user_id, 
+    spend, 
+    transaction_date, 
+    ROW_NUMBER() OVER (
+      PARTITION BY user_id ORDER BY transaction_date) AS row_num 
+  FROM transactions)
+ 
+SELECT 
+  user_id, 
+  spend, 
+  transaction_date 
+FROM trans_num 
+WHERE row_num = 3;
+
+-- Queries are the same, but I used a subquery for the analysis versus a common table expression (CTE)
