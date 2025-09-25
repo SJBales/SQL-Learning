@@ -1,0 +1,19 @@
+-- My Query
+WITH ranked_salaries AS (
+SELECT salary,
+       RANK() OVER(ORDER BY SALARY DESC) AS salary_ranking
+FROM employee)
+
+SELECT DISTINCT salary
+FROM ranked_salaries
+WHERE salary_ranking = 2;
+
+-- Data Lemur Solutions
+SELECT MAX(salary) AS second_highest_salary
+FROM employee
+WHERE salary < (
+    SELECT MAX(salary)
+    FROM employee
+);
+
+-- The MAX on salary is clever, and likely more efficient than ranking every row in the salary table
