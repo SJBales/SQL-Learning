@@ -1,1 +1,12 @@
+-- Concepts explored: RANK, DENSE_RANK, ROW_NUMBER
 
+-- Practicing using ROW_NUMBER
+SELECT case_number,
+       block,
+       primary_type,
+       EXTRACT(MONTH FROM date) AS month,
+       ROW_NUMBER()
+        OVER(PARTITION BY primary_type, block
+             ORDER BY EXTRACT(MONTH FROM date)) AS event_number
+FROM `bigquery-public-data.chicago_crime.crime`
+LIMIT 100;
