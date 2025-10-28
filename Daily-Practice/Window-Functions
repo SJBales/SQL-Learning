@@ -10,3 +10,15 @@ SELECT case_number,
              ORDER BY EXTRACT(MONTH FROM date)) AS event_number
 FROM `bigquery-public-data.chicago_crime.crime`
 LIMIT 100;
+
+-- Day 2. Concepts explored: LAG and LEAD
+
+SELECT case_number,
+       block,
+       primary_type,
+       EXTRACT(MONTH FROM date) AS month,
+       LAG(case_number, 1)
+        OVER(PARTITION BY primary_type, block
+             ORDER BY date) AS event_number
+FROM `bigquery-public-data.chicago_crime.crime`
+LIMIT 100;
