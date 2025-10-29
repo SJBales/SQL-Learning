@@ -1,4 +1,4 @@
--- Concepts explored: RANK, DENSE_RANK, ROW_NUMBER
+-- Day 1. Concepts explored: RANK, DENSE_RANK, ROW_NUMBER
 
 -- Practicing using ROW_NUMBER
 SELECT case_number,
@@ -22,3 +22,22 @@ SELECT case_number,
              ORDER BY date) AS event_number
 FROM `bigquery-public-data.chicago_crime.crime`
 LIMIT 100;
+
+-- Day 3. Working with the frame clause (ROWS and RANGE)
+
+-- Practice Query
+SELECT
+  job_id,
+  employee_id,
+  first_name,
+  last_name,
+  hire_date,
+  COUNT(employee_id) OVER (
+    PARTITION BY
+      job_id
+    ORDER BY
+      hire_date 
+  ROWS BETWEEN 1 PRECEDING AND CURRENT ROW
+  ) AS hire_order
+FROM
+  employees;
