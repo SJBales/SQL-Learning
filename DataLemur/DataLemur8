@@ -1,0 +1,10 @@
+-- Finding the number of companies with duplicate job postings
+WITH num_postings AS (SELECT job_id,
+       company_id,
+       job_id,
+       COUNT(*) OVER(PARTITION BY company_id, title, description) AS postings
+FROM job_listings)
+
+SELECT count(DISTINCT company_id) AS duplicate_companies
+FROM num_postings
+WHERE postings > 1;
