@@ -1,0 +1,39 @@
+-- CTE for initial page views
+WITH page_views AS (
+  SELECT user_pseudo_id,
+         event_name,
+         event_timestamp,
+         MAX(IF(events.key = 'ga_session_number', events.value.int_value, NULL)) AS session_number,
+         MAX(IF(events.key = 'page_title', events.value.string_value, NULL)) AS page_title
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`,
+   UNNEST(event_params) AS events
+  WHERE event_name = 'page_view'
+  GROUP BY user_pseudo_id,
+           event_name,
+           event_timestamp
+  ORDER BY user_pseudo_id,
+           session_number),
+
+-- Getting the first timestamp for the pageview
+distinct_page_views AS (SELECT user_pseudo_id,
+       event_name,
+       session_number,
+       MIN(event_timestamp) AS first_timestamp,
+       page_title
+FROM page_views
+GROUP BY user_pseudo_id,
+       event_name,
+       session_number,
+       page_title),
+
+-- Creating a final clean table
+clean_page_views AS (SELECT *,
+      ROW_NUMBER()
+       OVER(PARTITION BY user_pseudo_id,
+                         event_name,
+                         session_number
+            ORDER BY first_timestamp) AS view_order
+FROM distinct_page_views)
+
+SELECT *
+FROM clean_page_views;
