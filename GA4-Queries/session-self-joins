@@ -1,7 +1,6 @@
 -- CTE for initial page views
 WITH page_views AS (
   SELECT user_pseudo_id,
-         event_name,
          event_timestamp,
          MAX(IF(events.key = 'ga_session_number', events.value.int_value, NULL)) AS session_number,
          MAX(IF(events.key = 'page_title', events.value.string_value, NULL)) AS page_title
@@ -9,20 +8,17 @@ WITH page_views AS (
    UNNEST(event_params) AS events
   WHERE event_name = 'page_view'
   GROUP BY user_pseudo_id,
-           event_name,
            event_timestamp
   ORDER BY user_pseudo_id,
            session_number),
 
 -- Getting the first timestamp for the pageview
 distinct_page_views AS (SELECT user_pseudo_id,
-       event_name,
        session_number,
        MIN(event_timestamp) AS first_timestamp,
        page_title
 FROM page_views
 GROUP BY user_pseudo_id,
-       event_name,
        session_number,
        page_title),
 
@@ -30,10 +26,20 @@ GROUP BY user_pseudo_id,
 clean_page_views AS (SELECT *,
       ROW_NUMBER()
        OVER(PARTITION BY user_pseudo_id,
-                         event_name,
                          session_number
             ORDER BY first_timestamp) AS view_order
 FROM distinct_page_views)
 
-SELECT *
-FROM clean_page_views;
+-- Self join to see all sequential pages viewed
+SELECT p1.user_pseudo_id,
+       p1.session_number,
+       p1.page_title,
+       p1.view_order,
+       p2.session_number,
+       p2.page_title as next_page_title,
+       p2.view_order as next_view_order
+FROM clean_page_views p1
+JOIN clean_page_views p2
+     ON p1.user_pseudo_id = p2.user_pseudo_id
+     AND p1.session_number = p2.session_number
+     AND p2.view_order = (p1.view_order + 1);
