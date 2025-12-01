@@ -1,10 +1,35 @@
 -- Query to get the length of browsing sessions
 
 -- Initial query for all sessions
-SELECT user_pseudo_id,
+WITH sessions AS (SELECT user_pseudo_id,
        event_timestamp,
-       MAX(IF(events.key = 'ga_session_number', events.value.int_value, NULL)) as session_id
-FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`,
- UNNEST(event_params) AS events
-GROUP BY user_pseudo_id,
-         event_timestamp;
+       (SELECT events.value.int_value
+        FROM UNNEST(event_params) events
+        WHERE events.key = 'ga_session_number') as session_id
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`
+ORDER BY user_pseudo_id,
+         event_timestamp),
+
+-- Query to get the amount of time spent on each page
+page_time AS (SELECT *,
+       ROUND((LEAD(event_timestamp, 1) 
+        OVER(PARTITION BY user_pseudo_id,
+                          session_id
+             ORDER BY event_timestamp) - event_timestamp) / 1000000, 2) AS time_spent_on_page
+FROM sessions),
+
+-- Query to get the cumulative time per session
+session_time AS (SELECT *,
+       ROUND(SUM(time_spent_on_page)
+         OVER(PARTITION BY user_pseudo_id,
+                           session_id
+              ORDER BY event_timestamp
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS cumulative_session_time
+FROM page_time)
+
+-- Query to get total time per session
+SELECT *,
+      ROUND(MAX(cumulative_session_time)
+       OVER(PARTITION BY user_pseudo_id,
+                         session_id), 2) AS total_session_time
+FROM session_time;
