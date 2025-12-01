@@ -13,22 +13,17 @@ WITH page_views AS (
            session_number),
 
 -- Getting the first timestamp for the pageview
-distinct_page_views AS (SELECT user_pseudo_id,
+clean_page_views AS (SELECT user_pseudo_id,
        session_number,
-       MIN(event_timestamp) AS first_timestamp,
+       ROW_NUMBER() 
+              OVER(PARTITION BY user_pseudo_id,
+                                session_number
+                   ORDER BY MIN(event_timestamp)) AS view_order,
        page_title
 FROM page_views
 GROUP BY user_pseudo_id,
        session_number,
-       page_title),
-
--- Creating a final clean table
-clean_page_views AS (SELECT *,
-      ROW_NUMBER()
-       OVER(PARTITION BY user_pseudo_id,
-                         session_number
-            ORDER BY first_timestamp) AS view_order
-FROM distinct_page_views)
+       page_title)
 
 -- Self join to see all sequential pages viewed
 SELECT p1.user_pseudo_id,
