@@ -1,0 +1,10 @@
+-- Query to get the length of browsing sessions
+
+-- Initial query for all sessions
+SELECT user_pseudo_id,
+       event_timestamp,
+       MAX(IF(events.key = 'ga_session_number', events.value.int_value, NULL)) as session_id
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`,
+ UNNEST(event_params) AS events
+GROUP BY user_pseudo_id,
+         event_timestamp;
