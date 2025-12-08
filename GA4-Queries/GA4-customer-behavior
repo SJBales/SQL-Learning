@@ -1,0 +1,42 @@
+-- Task Overview
+
+-- Find users that:
+-- 1. Had multiple sessions in a single day
+-- 2. Viewed products but didn't purchase in their first session
+-- 3. Returned within 6 hours and completed a purchase
+
+--------------------------------------------------------------
+
+-- Prepping an initial backbone table with key columns
+WITH backbone AS (SELECT user_pseudo_id,
+       event_name,
+       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+       DATE(TIMESTAMP_MICROS(event_timestamp)) AS event_date,
+       (SELECT events.value.int_value FROM UNNEST(event_params) AS events WHERE events.key = 'ga_session_id') AS session_id,
+       CASE
+        WHEN event_name = 'purchase' THEN 1 ELSE NULL END AS purchased
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+ORDER BY user_pseudo_id, session_id, event_timestamp),
+
+-- Creating a table using aggregating to start analyses
+analysis_table AS (SELECT user_pseudo_id,
+       session_id,
+       event_date,
+       SUM(purchased) AS session_purchased,
+       MIN(event_timestamp) AS start_timestamp,
+       MAX(event_timestamp) AS end_timestamp,
+       COUNT(DISTINCT session_id)
+        OVER(PARTITION BY user_pseudo_id, 
+                          event_date) AS total_sessions,
+       ROW_NUMBER()
+        OVER(PARTITION BY user_pseudo_id,
+                          event_date
+             ORDER BY MIN(event_timestamp)) AS intraday_session_number
+FROM backbone
+GROUP BY user_pseudo_id,
+         session_id,
+         event_date)
+
+SELECT *
+FROM analysis_table
+ORDER BY user_pseudo_id, start_timestamp;
