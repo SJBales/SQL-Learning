@@ -14,6 +14,8 @@ WITH backbone AS (SELECT user_pseudo_id,
        DATE(TIMESTAMP_MICROS(event_timestamp)) AS event_date,
        (SELECT events.value.int_value FROM UNNEST(event_params) AS events WHERE events.key = 'ga_session_id') AS session_id,
        CASE
+        WHEN event_name = 'view_item' THEN 1 ELSE NULL END AS viewed_item,
+       CASE
         WHEN event_name = 'purchase' THEN 1 ELSE NULL END AS purchased
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
 ORDER BY user_pseudo_id, session_id, event_timestamp),
@@ -22,12 +24,15 @@ ORDER BY user_pseudo_id, session_id, event_timestamp),
 analysis_table AS (SELECT user_pseudo_id,
        session_id,
        event_date,
-       SUM(purchased) AS session_purchased,
+       CASE WHEN SUM(viewed_item) > 0 THEN 1 ELSE 0 END AS viewed_item,
+       CASE WHEN SUM(purchased) > 0 THEN 1 ELSE 0 END AS purchased_in_session,
        MIN(event_timestamp) AS start_timestamp,
        MAX(event_timestamp) AS end_timestamp,
+       -- Window to get the total intraday sessions
        COUNT(DISTINCT session_id)
         OVER(PARTITION BY user_pseudo_id, 
-                          event_date) AS total_sessions,
+                          event_date) AS total_intraday_sessions,
+       -- Window to get the intraday session number
        ROW_NUMBER()
         OVER(PARTITION BY user_pseudo_id,
                           event_date
@@ -35,8 +40,22 @@ analysis_table AS (SELECT user_pseudo_id,
 FROM backbone
 GROUP BY user_pseudo_id,
          session_id,
-         event_date)
+         event_date),
+
+-- Adding additional columns to filter off of
+filtering_table AS (
+       SELECT *,
+       -- Window to get hours since last sesion
+       EXTRACT(HOUR FROM end_timestamp - LAG(start_timestamp,1)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY start_timestamp)) AS time_since_last_session,
+       -- Window to get if the customer ever purchased
+       MAX(CASE WHEN purchased_in_session > 0 THEN 1 ELSE 0 END)
+        OVER(PARTITION BY user_pseudo_id) AS ever_purchased
+       -- NEXT SESSION: add CASE-WHEN to get customers who viewed items but did not purchase on the first visit
+FROM analysis_table
+ORDER BY user_pseudo_id, intraday_session_number)
 
 SELECT *
-FROM analysis_table
-ORDER BY user_pseudo_id, start_timestamp;
+FROM filtering_table
+WHERE ever_purchased > 0;
