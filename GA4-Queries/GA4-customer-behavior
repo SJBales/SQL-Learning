@@ -20,7 +20,7 @@ WITH backbone AS (SELECT user_pseudo_id,
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
 ORDER BY user_pseudo_id, session_id, event_timestamp),
 
--- Creating a table using aggregating to start analyses
+-- Creating a table using aggregations to start analyses
 analysis_table AS (SELECT user_pseudo_id,
        session_id,
        event_date,
@@ -46,16 +46,31 @@ GROUP BY user_pseudo_id,
 filtering_table AS (
        SELECT *,
        -- Window to get hours since last sesion
-       EXTRACT(HOUR FROM end_timestamp - LAG(start_timestamp,1)
+       EXTRACT(HOUR FROM LEAD(start_timestamp,1) 
         OVER(PARTITION BY user_pseudo_id
-             ORDER BY start_timestamp)) AS time_since_last_session,
+             ORDER BY start_timestamp) - end_timestamp) AS hours_since_last_session,
        -- Window to get if the customer ever purchased
        MAX(CASE WHEN purchased_in_session > 0 THEN 1 ELSE 0 END)
-        OVER(PARTITION BY user_pseudo_id) AS ever_purchased
-       -- NEXT SESSION: add CASE-WHEN to get customers who viewed items but did not purchase on the first visit
+        OVER(PARTITION BY user_pseudo_id) AS ever_purchased,
+       -- CASE-WHEN to get customers who viewed items but did not purchase on the first visit
+       CASE 
+        WHEN intraday_session_number = 1 AND purchased_in_session = 1 THEN 1 
+        ELSE 0 
+       END AS purchase_on_first,
+       -- Window to find customers that purchased on the next session
+       LEAD(purchased_in_session, 1)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY start_timestamp) AS purchase_next_session
 FROM analysis_table
-ORDER BY user_pseudo_id, intraday_session_number)
+ORDER BY user_pseudo_id, start_timestamp)
 
+-- Filtering the analytics table to get the final result
 SELECT *
 FROM filtering_table
-WHERE ever_purchased > 0;
+WHERE (ever_purchased > 0)
+      AND (total_intraday_sessions > 1)
+      AND (purchase_next_session = 1)
+      AND (hours_since_last_session <= 6)
+      AND (purchase_on_first = 0)
+      AND (intraday_session_number = 1)
+      AND (viewed_item = 1);
