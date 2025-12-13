@@ -1,0 +1,25 @@
+WITH raw_table AS (
+  SELECT user_pseudo_id,
+       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+       event_name,
+       (SELECT events.value.int_value
+        FROM UNNEST(event_params) events 
+        WHERE events.key = 'ga_session_id') AS session_id,
+       (SELECT events.value.string_value
+        FROM UNNEST(event_params) events
+        WHERE events.key = 'page_title') AS page_viewed
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`
+ORDER BY user_pseudo_id, event_timestamp),
+
+session_timing AS (SELECT user_pseudo_id,
+       session_id,
+       MIN(event_timestamp)
+        OVER(PARTITION BY user_pseudo_id,
+                          session_id) AS session_start,
+      MAX(event_timestamp)
+       OVER(PARTITION BY user_pseudo_id,
+                         session_id) AS session_end
+FROM raw_table)
+
+SELECT *'
+FROM raw_table;
