@@ -1,0 +1,53 @@
+-- Initial CTE to get session boundaries
+WITH session_boundaries AS (SELECT user_pseudo_id,
+       event_name,
+       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+        CASE
+         WHEN (event_name = 'session_start') OR 
+            (event_timestamp - LAG(event_timestamp, 1) OVER(PARTITION BY user_pseudo_id ORDER BY event_timestamp)) > (1800 * POWER(10, 6)) THEN 1
+            ELSE 0
+        END as session_start_ind
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX = '20210131'),
+
+-- CTE to count session numbers
+session_numbers AS (SELECT *,
+       SUM(session_start_ind)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY event_timestamp) AS session_number
+FROM session_boundaries
+ORDER BY user_pseudo_id, event_timestamp),
+
+-- Identifying events
+events AS (SELECT *,
+       -- Getting first and last session activities
+       FIRST_VALUE(event_name)
+        OVER(PARTITION BY user_pseudo_id, session_number
+             ORDER BY event_timestamp) AS first_event_name,
+      LAST_VALUE(event_name)
+       OVER(PARTITION BY user_pseudo_id, session_number 
+            ORDER BY event_timestamp
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_event_name,
+
+      -- Getting start and stop timestamps
+      FIRST_VALUE(event_timestamp)
+        OVER(PARTITION BY user_pseudo_id, session_number
+             ORDER BY event_timestamp) AS start_timestamp,
+      LAST_VALUE(event_timestamp)
+       OVER(PARTITION BY user_pseudo_id, session_number 
+            ORDER BY event_timestamp
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_timestamp,
+FROM session_numbers)
+
+-- Final selections
+SELECT user_pseudo_id,
+       session_number,
+       first_event_name,
+       last_event_name,
+       (MAX(end_timestamp) - MIN(start_timestamp)) AS session_duration_seconds,
+       COUNT(event_name) AS total_events_in_session
+FROM events
+GROUP BY user_pseudo_id,
+       session_number,
+       first_event_name,
+       last_event_name;
