@@ -1,3 +1,12 @@
+--Write a query that:
+
+-- 1. Identifies distinct sessions for each user (use 30-minute inactivity timeout)
+-- 2. Calculates session metrics: pages viewed, time spent, conversion events
+-- 3. Uses self-join to find users who had multiple "high-quality" sessions (≥5 pages AND ≥300 seconds)
+-- 4. Uses window functions to rank sessions by quality within each user
+-- 5. Compares multi-session power users vs single-session users
+
+-- Creating a raw table for session metrics
 WITH raw_table AS (
   SELECT user_pseudo_id,
        TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
@@ -11,6 +20,7 @@ WITH raw_table AS (
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20210131`
 ORDER BY user_pseudo_id, event_timestamp),
 
+-- Getting the timing of sessions
 session_timing AS (SELECT user_pseudo_id,
        session_id,
        MIN(event_timestamp)
@@ -21,5 +31,5 @@ session_timing AS (SELECT user_pseudo_id,
                          session_id) AS session_end
 FROM raw_table)
 
-SELECT *'
+SELECT *
 FROM raw_table;
