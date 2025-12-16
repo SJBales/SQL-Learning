@@ -1,21 +1,23 @@
 WITH session_boundaries AS (SELECT user_pseudo_id,
        event_name,
        TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-       (SELECT events.value.int_value
-        FROM UNNEST(event_params) events
-        WHERE events.key = 'ga_session_id') AS session_id,
         CASE
          WHEN (event_name = 'session_start') OR 
             (event_timestamp - LAG(event_timestamp, 1) OVER(PARTITION BY user_pseudo_id ORDER BY event_timestamp)) > (1800 * POWER(10, 6)) THEN 1
             ELSE 0
-        END as session_start
+        END as session_start_ind
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
-WHERE _TABLE_SUFFIX = '20210131')
+WHERE _TABLE_SUFFIX = '20210131'),
+
+session_numbers AS (SELECT *,
+       SUM(session_start_ind)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY event_timestamp) AS session_number
+FROM session_boundaries
+ORDER BY user_pseudo_id, event_timestamp)
 
 SELECT *,
-       SUM(session_start)
-        OVER(PARTITION BY user_pseudo_id
-             ORDER BY event_timestamp) AS session_number,
-       COUNT(DISTINCT session_start)
+       MAX(session_number)
         OVER(PARTITION BY user_pseudo_id) AS total_sessions
-FROM session_boundaries;
+FROM session_numbers
+ORDER BY total_sessions DESC;
