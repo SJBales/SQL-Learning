@@ -1,0 +1,48 @@
+-- Identifying individual sessions per user
+WITH sessions AS (SELECT user_pseudo_id,
+       event_name,
+       event_timestamp,
+       CASE 
+        WHEN (event_name = 'session_start') OR 
+             (event_timestamp - (LAG(event_timestamp, 1) 
+                OVER(PARTITION BY user_pseudo_id
+                     ORDER BY event_timestamp))) > (1800 * POWER(10, 6)) THEN 1
+                ELSE 0
+        END AS session_start_ind
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX = '20210131'),
+
+-- Numbering the sessions
+session_numbers AS (SELECT *,
+       SUM(session_start_ind)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY event_timestamp) AS session_number
+FROM sessions),
+
+-- Getting session start and end dates
+session_start_end AS (SELECT user_pseudo_id,
+       session_number,
+       MIN(event_timestamp) AS session_start,
+       MAX(event_timestamp) AS session_end
+FROM session_numbers
+GROUP BY user_pseudo_id, session_number),
+
+-- Lagging session end dates to set myself up to calculate durations
+session_lags AS (SELECT user_pseudo_id,
+       session_number,
+       session_start, 
+       LAG(session_end, 1) 
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY session_number) AS previous_session_end_time,
+      (session_start - (LAG(session_end, 1) 
+                           OVER(PARTITION BY user_pseudo_id
+                                ORDER BY session_number))) / POWER(10, 6) AS session_gap_seconds
+FROM session_start_end)
+
+-- Calculating final results
+SELECT *,
+       CASE 
+          WHEN session_gap_seconds < (60 * 60) THEN TRUE 
+          ELSE FALSE 
+       END AS quick_return
+FROM session_lags;
