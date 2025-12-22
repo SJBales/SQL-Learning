@@ -1,0 +1,12 @@
+-- Exercise: Identify which users had sessions on sequential days
+-- Extension: Identify users who purchased items on sequential days
+-- Techniquest to leverage: Gaps & Islands (R_N - value, flag & sum)
+
+-- First query to get the session backbone
+SELECT user_pseudo_id,
+       DATE(TIMESTAMP_MICROS(event_timestamp)) AS event_date,
+       COUNT(event_name) total_events
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX = '20210131'
+GROUP BY user_pseudo_id,
+       DATE(TIMESTAMP_MICROS(event_timestamp));
