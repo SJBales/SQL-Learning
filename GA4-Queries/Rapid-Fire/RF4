@@ -1,12 +1,33 @@
 -- Exercise: Identify which users had sessions on sequential days
--- Extension: Identify users who purchased items on sequential days
 -- Techniquest to leverage: Gaps & Islands (R_N - value, flag & sum)
 
 -- First query to get the session backbone
-SELECT user_pseudo_id,
+WITH session_days AS (SELECT user_pseudo_id,
        DATE(TIMESTAMP_MICROS(event_timestamp)) AS event_date,
-       COUNT(event_name) total_events
+       COUNT(event_name) total_events,
+       SUM(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchased
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
-WHERE _TABLE_SUFFIX = '20210131'
+WHERE _TABLE_SUFFIX IN ('20210128', '20210129', '20210130', '20210131')
 GROUP BY user_pseudo_id,
-       DATE(TIMESTAMP_MICROS(event_timestamp));
+       DATE(TIMESTAMP_MICROS(event_timestamp))),
+
+-- Determining the start of each island
+islands AS (SELECT *,
+       event_date - ROW_NUMBER()
+         OVER(PARTITION BY user_pseudo_id
+              ORDER BY event_date) + 1 AS island_id
+FROM session_days),
+
+-- Finding the total length of the island sequence
+island_length AS (SELECT user_pseudo_id,
+       island_id,
+       COUNT(total_events) as consecutive_days
+FROM islands
+GROUP BY user_pseudo_id, 
+         island_id
+ORDER BY COUNT(total_events) DESC)
+
+-- Final query to grab all user pseudo id's with at least one sequential day streak
+SELECT DISTINCT user_pseudo_id
+FROM island_length
+WHERE consecutive_days > 1;
