@@ -1,0 +1,36 @@
+-- You want to identify users who go on "shopping sprees" - consecutive days where they make multiple purchases (3+ transactions per day) on weekdays only.
+-- Find all streaks of 3 or more consecutive weekdays where a user had 3+ purchase events per day.
+
+-- First CTE to get purchases by users
+WITH purchases AS (SELECT user_pseudo_id,
+       DATE(TIMESTAMP_MICROS(event_timestamp)) as event_date,
+       CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END AS purchase
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX IN ('20210128', '20210129', '20210130', '20210131')),
+
+-- Getting the total number of purchases by user and date
+user_purchase_dates AS (SELECT user_pseudo_id,
+       event_date,
+       SUM(purchase) AS purchases
+FROM purchases
+GROUP BY user_pseudo_id, event_date),
+
+-- Identifying user islands
+user_island_ids AS (SELECT user_pseudo_id,
+       event_date,
+       purchases,
+       (event_date - ROW_NUMBER() OVER(PARTITION BY user_pseudo_id ORDER BY event_date)) + 1 AS island_id
+FROM user_purchase_dates
+ORDER BY user_pseudo_id, event_date)
+
+-- Finding the total purchases, start, end dates and length
+SELECT user_pseudo_id, 
+       island_id,
+       SUM(purchases) AS total_purchases,
+       MIN(event_date) AS streak_start,
+       MAX(event_date) AS streak_end,
+       COUNT(*) AS streak_length
+FROM user_island_ids
+WHERE purchases > 0
+GROUP BY user_pseudo_id, 
+       island_id;
