@@ -1,5 +1,5 @@
 -- Exercise: Identify which users had sessions on sequential days
--- Techniquest to leverage: Gaps & Islands (R_N - value, flag & sum)
+-- Techniques to leverage: Gaps & Islands (R_N - value, flag & sum)
 
 -- First query to get the session backbone
 WITH session_days AS (SELECT user_pseudo_id,
