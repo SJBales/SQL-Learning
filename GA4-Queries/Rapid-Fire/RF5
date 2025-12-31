@@ -1,4 +1,4 @@
--- You want to identify users who go on "shopping sprees" - consecutive days where they make multiple purchases (3+ transactions per day) on weekdays only.
+-- Identify users who go on "shopping sprees" - consecutive days where they make multiple purchases (3+ transactions per day) on weekdays only.
 -- Find all streaks of 3 or more consecutive weekdays where a user had 3+ purchase events per day.
 
 -- First CTE to get purchases by users
@@ -6,31 +6,37 @@ WITH purchases AS (SELECT user_pseudo_id,
        DATE(TIMESTAMP_MICROS(event_timestamp)) as event_date,
        CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END AS purchase
 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
-WHERE _TABLE_SUFFIX IN ('20210128', '20210129', '20210130', '20210131')),
+WHERE --_TABLE_SUFFIX IN ('20210126', '20210127', '20210128', '20210129', '20210130', '20210131') AND
+     EXTRACT(DAYOFWEEK FROM TIMESTAMP_MICROS(event_timestamp)) NOT IN (1, 7)),
 
 -- Getting the total number of purchases by user and date
 user_purchase_dates AS (SELECT user_pseudo_id,
        event_date,
-       SUM(purchase) AS purchases
+       SUM(purchase) AS total_daily_purchases
 FROM purchases
 GROUP BY user_pseudo_id, event_date),
 
 -- Identifying user islands
 user_island_ids AS (SELECT user_pseudo_id,
        event_date,
-       purchases,
+       total_daily_purchases,
        (event_date - ROW_NUMBER() OVER(PARTITION BY user_pseudo_id ORDER BY event_date)) + 1 AS island_id
 FROM user_purchase_dates
-ORDER BY user_pseudo_id, event_date)
+WHERE total_daily_purchases >= 1
+ORDER BY user_pseudo_id, event_date),
 
 -- Finding the total purchases, start, end dates and length
-SELECT user_pseudo_id, 
+streak_table AS (SELECT user_pseudo_id, 
        island_id,
-       SUM(purchases) AS total_purchases,
+       SUM(total_daily_purchases) AS total_purchases,
        MIN(event_date) AS streak_start,
        MAX(event_date) AS streak_end,
        COUNT(*) AS streak_length
 FROM user_island_ids
-WHERE purchases > 0
 GROUP BY user_pseudo_id, 
-       island_id;
+       island_id)
+
+-- Generating the final answer: no users had a multi-day purchase streak
+SELECT COUNT(*)
+FROM streak_table
+WHERE streak_length >= 2;
