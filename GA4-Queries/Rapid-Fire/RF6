@@ -1,0 +1,41 @@
+-- Task: Find users with the longest multi-day usage streaks
+
+------------ Query ------------
+
+-- Initial query to get total sessions by user
+WITH sessions AS (
+  SELECT user_pseudo_id,
+         DATE(TIMESTAMP_MICROS(event_timestamp)) AS event_date,
+         COUNT(*) AS total_events
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE event_name NOT IN ('session_start', 'view_promotion')
+        --AND _TABLE_SUFFIX IN ('20210126', '20210127', '20210128', '20210129', '20210130', '20210131')
+  GROUP BY user_pseudo_id,
+           DATE(TIMESTAMP_MICROS(event_timestamp))),
+
+-- Identifying the session islands
+islands AS (SELECT *,
+       (event_date - ROW_NUMBER()
+         OVER(PARTITION BY user_pseudo_id
+              ORDER BY event_date)) + 1 AS island_start
+FROM sessions
+ORDER BY user_pseudo_id, event_date),
+
+-- Finding daily session streaks by users
+streak_lengths AS (SELECT user_pseudo_id,
+       island_start,
+       COUNT(*) AS streak_length,
+       SUM(total_events) AS engagement_intensity
+FROM islands
+GROUP BY user_pseudo_id, island_start
+ORDER BY streak_length DESC, engagement_intensity DESC),
+
+-- Table for the longest streak
+longest_streak AS (SELECT MAX(streak_length) AS streak_length FROM streak_lengths)
+
+-- Finding the most active users
+SELECT sl.user_pseudo_id,
+       sl.streak_length,
+       sl.engagement_intensity
+FROM streak_lengths sl
+INNER JOIN longest_streak ls ON sl.streak_length = ls.streak_length;
