@@ -1,0 +1,70 @@
+/*
+
+Task: Define common user paths within sessions. Behaviors to identify:
+  1) Single click sessions (land after viewing an ad or promotion with no follow-up activity)
+  2) Browse but no purchase
+  3) Browse and abandon cart
+  4) Purchase
+
+Key constraints: a session is assumed to timeout after 30 mins of inactivity
+
+*/
+
+-- Initial Query for a Backbone of Session Data
+WITH clean_backbone AS (
+SELECT user_pseudo_id,
+       event_name,
+       event_timestamp,
+       CASE
+        WHEN -- first event in a session
+             ((ROW_NUMBER() OVER(PARTITION BY user_pseudo_id ORDER BY event_timestamp)) = 1)
+              OR 
+              -- 30 min timeout
+              ((event_timestamp - LAG(event_timestamp) OVER(PARTITION BY user_pseudo_id ORDER BY EVENT_TIMESTAMP)) > (30 * 60 * POWER(10, 6))) THEN 1
+        ELSE 0
+      END AS new_session
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX = '20210101'),
+
+-- Labeling Sesssions and Events
+sessions AS (
+  SELECT *,
+      -- Adding Session Labels
+       SUM(new_session)
+        OVER(PARTITION BY user_pseudo_id
+             ORDER BY event_timestamp) AS session_number,
+      -- Labeling Page Views
+      CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END AS page_view,
+      -- Labeling Clicks
+      CASE WHEN event_name = 'click' THEN 1 ELSE 0 END AS click,
+      -- Labeling View Item
+      CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END AS view_item,
+      -- Labeling Select Item
+      CASE WHEN event_name = 'select_item' THEN 1 ELSE 0 END AS select_item,
+      -- Labeling Adds to Cart
+      CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END AS add_to_cart,
+      -- Labeling Beginning Checkout
+      CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END AS begin_checkout,
+      -- Labeling Purchase
+      CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END AS purchase
+FROM clean_backbone),
+
+-- Computing Session Statistics
+session_stats AS (
+  SELECT user_pseudo_id,
+         session_number,
+         SUM(page_view) AS page_views,
+         SUM(click) AS clicks,
+         SUM(view_item) AS items_viewed,
+         SUM(select_item) AS items_selected,
+         SUM(add_to_cart) AS items_added_to_cart,
+         SUM(begin_checkout) AS checkout_started
+  FROM sessions
+  GROUP BY user_pseudo_id, session_number)
+
+SELECT *
+FROM session_stats;
+
+/*
+For Next Time: Define user behavior patterns based on session stats
+*/
