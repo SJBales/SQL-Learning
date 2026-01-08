@@ -35,8 +35,6 @@ sessions AS (
              ORDER BY event_timestamp) AS session_number,
       -- Labeling Page Views
       CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END AS page_view,
-      -- Labeling Clicks
-      CASE WHEN event_name = 'click' THEN 1 ELSE 0 END AS click,
       -- Labeling View Item
       CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END AS view_item,
       -- Labeling Select Item
@@ -54,17 +52,27 @@ session_stats AS (
   SELECT user_pseudo_id,
          session_number,
          SUM(page_view) AS page_views,
-         SUM(click) AS clicks,
          SUM(view_item) AS items_viewed,
          SUM(select_item) AS items_selected,
          SUM(add_to_cart) AS items_added_to_cart,
-         SUM(begin_checkout) AS checkout_started
+         SUM(begin_checkout) AS checkout_started,
+         SUM(purchase) AS purchased
   FROM sessions
   GROUP BY user_pseudo_id, session_number)
 
-SELECT *
+-- Query to define the user journeys
+SELECT *,
+       CASE
+        WHEN purchased > 0 THEN 'purchaser'
+        WHEN items_added_to_cart > 0 THEN 'abandoned cart'
+        WHEN items_selected > 0 THEN 'browser'
+        WHEN items_viewed > 0 THEN 'item viewer'
+        WHEN page_views > 1 THEN 'page viewer'
+        WHEN page_views = 1 THEN 'one and done'
+        ELSE 'nothing burger'
+      END AS user_journey
 FROM session_stats;
 
 /*
-For Next Time: Define user behavior patterns based on session stats
+For Next Time: Quantify categories, classify users
 */
