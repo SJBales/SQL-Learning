@@ -58,10 +58,10 @@ session_stats AS (
          SUM(begin_checkout) AS checkout_started,
          SUM(purchase) AS purchased
   FROM sessions
-  GROUP BY user_pseudo_id, session_number)
+  GROUP BY user_pseudo_id, session_number),
 
 -- Query to define the user journeys
-SELECT *,
+total_user_types AS (SELECT *,
        CASE
         WHEN purchased > 0 THEN 'purchaser'
         WHEN items_added_to_cart > 0 THEN 'abandoned cart'
@@ -71,8 +71,12 @@ SELECT *,
         WHEN page_views = 1 THEN 'one and done'
         ELSE 'nothing burger'
       END AS user_journey
-FROM session_stats;
+FROM session_stats)
 
-/*
-For Next Time: Quantify categories, classify users
-*/
+-- Aggregrating user types
+SELECT user_journey,
+       COUNT(*) AS total_users,
+       ROUND((COUNT(*) / (SELECT COUNT(*) FROM total_user_types))* 100, 1) AS perc_users
+FROM total_user_types
+GROUP BY user_journey
+ORDER BY COUNT(*) DESC
