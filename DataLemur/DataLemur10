@@ -1,3 +1,21 @@
+-- My Original Solution
+WITH agg_song_plays AS (SELECT user_id,
+       song_id,
+       COUNT(listen_time) AS song_plays
+FROM songs_weekly
+WHERE listen_time <= '08/04/2022 23:59:59'
+GROUP BY user_id, song_id)
+
+SELECT COALESCE(sh.user_id, asp.user_id) AS user_id,
+       COALESCE(sh.song_id, asp.song_id) AS song_id,
+       COALESCE(sh.song_plays, 0) + COALESCE(asp.song_plays, 0) as song_plays
+FROM songs_history sh
+FULL JOIN agg_song_plays asp 
+ON sh.user_id = asp.user_id AND sh.song_id = asp.song_id
+ORDER BY song_plays DESC;
+
+
+-- Data Lemur's Solution
 WITH agg_song_plays AS (
 
 SELECT user_id,
