@@ -1,0 +1,11 @@
+WITH times AS (SELECT call_number,
+       incident_number,
+       call_type,
+       call_date,
+       TIMESTAMP_DIFF(response_timestamp, received_timestamp, SECOND) AS received_to_response,
+       (on_scene_timestamp - response_timestamp) AS response_to_on_scene
+FROM `bigquery-public-data.san_francisco.sffd_service_calls`)
+
+SELECT *,
+       STDDEV(received_to_response) OVER(PARTITION BY call_type) as standard_dev
+FROM times;
