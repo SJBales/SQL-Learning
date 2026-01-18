@@ -1,11 +1,26 @@
+/*
+Explore the functionality of statistical functions (STTDEV, VAR) on response time dataset
+*/
+
+-- Initial CTE to get the time between response and call
 WITH times AS (SELECT call_number,
        incident_number,
        call_type,
        call_date,
        TIMESTAMP_DIFF(response_timestamp, received_timestamp, SECOND) AS received_to_response,
        (on_scene_timestamp - response_timestamp) AS response_to_on_scene
-FROM `bigquery-public-data.san_francisco.sffd_service_calls`)
+FROM `bigquery-public-data.san_francisco.sffd_service_calls`
+LIMIT 10000),
 
+-- Calculating standard deviation and average received to response
+time_stats AS (
+  SELECT *,
+        STDDEV(received_to_response) OVER(PARTITION BY call_type) as response_stdev,
+        AVG(received_to_response) OVER(PARTITION BY call_type) as response_avg   
+FROM times)
+
+-- Flagging outliers
 SELECT *,
-       STDDEV(received_to_response) OVER(PARTITION BY call_type) as standard_dev
-FROM times;
+      CASE WHEN received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev) THEN 'outlier' ELSE NULL END AS outlier_detection_cw,
+      (received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev)) AS outlier_detection_bool
+FROM time_stats;
