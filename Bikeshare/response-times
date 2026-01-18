@@ -16,11 +16,14 @@ LIMIT 10000),
 time_stats AS (
   SELECT *,
         STDDEV(received_to_response) OVER(PARTITION BY call_type) as response_stdev,
-        AVG(received_to_response) OVER(PARTITION BY call_type) as response_avg   
+        AVG(received_to_response) OVER(PARTITION BY call_type) as response_avg,
+        PERCENTILE_CONT(received_to_response, 0.25) OVER(PARTITION BY call_type) AS lq,
+        PERCENTILE_CONT(received_to_response, 0.75) OVER(PARTITION BY call_type) AS uq
 FROM times)
 
 -- Flagging outliers
 SELECT *,
-      CASE WHEN received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev) THEN 'outlier' ELSE NULL END AS outlier_detection_cw,
-      (received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev)) AS outlier_detection_bool
+      CASE WHEN received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev) THEN 'outlier' ELSE NULL END AS zscore_outlier_cw,
+      (received_to_response < response_avg - (2 * response_stdev) OR received_to_response > response_avg + (2 * response_stdev)) AS zscore_outlier_bool,
+      (received_to_response < (lq - (1.5 * (uq - lq)))) OR (received_to_response > (uq + (1.5 * (uq - lq)))) AS iqr_outlier
 FROM time_stats;
