@@ -1,0 +1,11 @@
+WITH start_station_durations AS (SELECT start_station_name,
+       PERCENTILE_CONT(duration_sec, 0.25) OVER(PARTITION BY start_station_name) AS q1,
+       PERCENTILE_CONT(duration_sec, 0.5) OVER(PARTITION BY start_station_name) AS median,
+       PERCENTILE_CONT(duration_sec, 0.75) OVER(PARTITION BY start_station_name) AS q3
+FROM `bigquery-public-data.san_francisco_bikeshare.bikeshare_trips`
+QUALIFY ROW_NUMBER() OVER(PARTITION BY start_station_name ORDER BY duration_sec) = 1)
+
+
+SELECT *
+FROM start_station_durations
+ORDER BY median DESC;
