@@ -1,0 +1,21 @@
+-- My original Query
+WITH salaries AS (
+SELECT x.employee_id,
+       x.name,
+       x.salary AS employee_salary,
+       y.salary AS manager_salary,
+       x.salary > y.salary AS lower_manager_salary
+FROM employee x
+INNER JOIN employee y ON x.manager_id = y.employee_id)
+
+SELECT employee_id, 
+       "name" 
+FROM salaries
+WHERE lower_manager_salary
+
+-- Shorter, more efficient query (add logic in WHERE clause)
+SELECT x.employee_id,
+       x.name
+FROM employee x
+INNER JOIN employee y ON x.manager_id = y.employee_id
+WHERE x.salary > y.salary
