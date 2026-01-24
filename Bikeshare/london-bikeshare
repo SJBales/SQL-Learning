@@ -1,0 +1,18 @@
+-- Counting the most common start and end station pairs
+SELECT CONCAT(start_station_name, ' : ', end_station_name) AS stations,
+       COUNT(*) AS total_trips,
+       AVG(duration) AS avg_duration
+FROM `bigquery-public-data.london_bicycles.cycle_hire`
+--WHERE start_station_name != end_station_name
+GROUP BY CONCAT(start_station_name, ' : ', end_station_name)
+ORDER BY COUNT(*) DESC;
+
+-- Checking the duration col where start and end station is the same
+SELECT start_station_name,
+       end_station_name,
+       start_date,
+       end_date,
+       duration,
+       TIMESTAMP_DIFF(end_date, start_date, SECOND) AS total_time
+FROM `bigquery-public-data.london_bicycles.cycle_hire`
+WHERE start_station_name = end_station_name;
