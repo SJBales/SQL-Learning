@@ -1,0 +1,44 @@
+/*
+Running linear regression on total taxi fares based on trip duration
+*/
+
+-- CTE to yield a table with trip totals and trip durations
+WITH input_data AS (SELECT trip_total,
+       trip_seconds
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+WHERE (RAND() <0.1) AND
+      (trip_total IS NOT NULL) AND
+      (trip_total > 0) AND
+      (trip_seconds IS NOT NULL) AND
+      (trip_seconds > 0)),
+
+-- Calculating parameters for input in linear regression
+param_inputs AS (
+      SELECT COUNT(*) AS n,
+             SUM(CAST(trip_seconds AS FLOAT64)) AS sum_trip_seconds,
+             SUM(CAST(trip_total AS FLOAT64)) AS sum_trip_total,
+             SUM(CAST(trip_seconds AS FLOAT64) * CAST(trip_total AS FLOAT64)) AS sum_prod_trip_total,
+             SUM(CAST(trip_seconds AS FLOAT64) * CAST(trip_seconds AS FLOAT64)) AS sum_trip_squared
+      FROM input_data
+),
+
+-- CTE for the regression
+regression AS (
+      SELECT (n * sum_prod_trip_total - sum_trip_seconds * sum_trip_total) / 
+              (n * sum_trip_squared - sum_trip_total * sum_trip_total) AS slope,
+             (sum_trip_total - ((n * sum_prod_trip_total - sum_trip_seconds * sum_trip_total) / 
+                                (n * sum_trip_squared - sum_trip_total * sum_trip_total) * sum_trip_seconds)) / n AS intercept
+      FROM param_inputs
+),
+
+-- Making predictions
+predictions AS (SELECT t.*,
+                (r.intercept + (r.slope * t.trip_seconds)) AS predicted_value,
+                t.trip_total - (r.intercept + (r.slope * t.trip_seconds)) AS residual
+FROM input_data t
+CROSS JOIN regression r
+)
+
+-- Inspecting final results
+SELECT *
+FROM predictions;
