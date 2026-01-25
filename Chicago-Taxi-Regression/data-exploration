@@ -1,0 +1,25 @@
+/*
+Data exploration
+*/
+
+-- Determining missingness and presence of zeros in a couple of key columns
+SELECT ROUND(AVG(CASE WHEN fare IS NULL OR fare = 0 THEN 1 ELSE 0 END) * 100, 2) AS fare_missingness,
+       ROUND(AVG(CASE WHEN trip_total IS NULL OR trip_total = 0 THEN 1 ELSE 0 END) * 100, 2) AS total_missingness,
+       ROUND(AVG(CASE WHEN trip_seconds IS NULL OR trip_seconds = 0 THEN 1 ELSE 0 END) * 100, 2) AS duration_missingness
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`;
+
+-- Looking at the distribution of fares
+SELECT DISTINCT PERCENTILE_CONT(trip_total, 0.25) OVER() AS lq,
+       PERCENTILE_CONT(trip_total, 0.5) OVER() AS median,
+       PERCENTILE_CONT(trip_total, 0.75) OVER() AS uq
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+TABLESAMPLE SYSTEM (10 PERCENT)
+WHERE trip_total IS NOT NULL AND trip_total > 0;
+
+-- Looking at the distribution of total trip duration
+SELECT DISTINCT PERCENTILE_CONT(trip_seconds, 0.25) OVER() AS lq,
+       PERCENTILE_CONT(trip_seconds, 0.5) OVER() AS median,
+       PERCENTILE_CONT(trip_seconds, 0.75) OVER() AS uq
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+TABLESAMPLE SYSTEM (10 PERCENT)
+WHERE trip_seconds IS NOT NULL AND trip_seconds > 0;
