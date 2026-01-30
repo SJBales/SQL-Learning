@@ -1,0 +1,41 @@
+-- MY Query
+WITH cust_pays AS (
+SELECT CASE WHEN a.user_id IS NULL THEN p.user_id ELSE a.user_id END AS user_id,
+       status,
+       paid
+FROM advertiser a
+FULL JOIN daily_pay p ON a.user_id = p.user_id)
+
+SELECT user_id,
+       CASE
+        WHEN status IS NULL THEN 'NEW'
+        WHEN status = 'NEW' AND paid IS NOT NULL THEN 'EXISTING'
+        WHEN status = 'EXISTING' AND paid IS NOT NULL THEN 'EXISTING'
+        WHEN status = 'CHURN' AND paid IS NOT NULL THEN 'RESURRECT'
+        WHEN status = 'RESURRECT' AND paid IS NOT NULL THEN 'EXISTING'
+        ELSE 'CHURN'
+       END AS new_status
+FROM cust_pays
+ORDER BY user_id;
+
+-- DataLemur Solution
+SELECT 
+  COALESCE(advertiser.user_id, daily_pay.user_id) AS user_id,
+  CASE 
+    WHEN paid IS NULL THEN 'CHURN' 
+    WHEN paid IS NOT NULL AND advertiser.status IN ('NEW','EXISTING','RESURRECT') THEN 'EXISTING'
+    WHEN paid IS NOT NULL AND advertiser.status = 'CHURN' THEN 'RESURRECT'
+    WHEN paid IS NOT NULL AND advertiser.status IS NULL THEN 'NEW'
+  END AS new_status
+FROM advertiser
+FULL OUTER JOIN daily_pay
+  ON advertiser.user_id = daily_pay.user_id
+ORDER BY user_id;
+
+/*
+Learnings:
+1. Use COALESCE for null columns instead of a case when
+2. I don't need a CTE, I can run the CASE WHEN in a single query
+3. I should think more critically about which groups can becombined to yield the same result (i.e. new, existing, and resurrect)
+4. Use a full outer join, be explicit!
+*/
