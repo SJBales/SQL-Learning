@@ -1,0 +1,21 @@
+-- Creating a CTE with islands
+WITH islands AS (SELECT user_id,
+       transaction_date,
+       transaction_date - (ROW_NUMBER() 
+          OVER(PARTITION BY user_id ORDER BY transaction_date) || 'days')::INTERVAL AS islands
+FROM transactions
+ORDER BY user_id, transaction_date),
+
+-- Finding the streaks that are at least 3 days long
+streaks AS (
+SELECT user_id,
+       islands,
+       COUNT(*) AS streak
+FROM islands
+GROUP BY user_id, islands
+HAVING COUNT(*) >= 3)
+
+-- Finding users and sorting by index
+SELECT user_id
+FROM streaks
+ORDER BY user_id;
