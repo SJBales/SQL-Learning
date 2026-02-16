@@ -1,0 +1,42 @@
+WITH ride_volume AS (SELECT DATE(start_time) AS day,
+       end_station_name,
+       COUNT(*) AS total_rides
+FROM `bigquery-public-data.austin_bikeshare.bikeshare_trips`
+--TABLESAMPLE SYSTEM (10 PERCENT)
+GROUP BY DATE(start_time), end_station_name),
+
+-- getting the trend
+trend AS (
+  SELECT day,
+         end_station_name,
+         total_rides,
+         AVG(total_rides) 
+            OVER(PARTITION BY end_station_name
+                 ORDER BY day
+                 ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) AS trend_
+  FROM ride_volume),
+
+-- detrending values
+detrended AS (
+  SELECT *,
+         total_rides - trend_ AS detrended
+  FROM trend
+),
+
+-- getting monthly seasonality
+seasonality AS (
+  SELECT EXTRACT(MONTH FROM day) AS month_,
+  AVG(total_rides) AS avg_monthly_ride_volume
+  FROM ride_volume
+  GROUP BY month_
+)
+
+SELECT d.day,
+       d.end_station_name,
+       d.total_rides,
+       d.trend_,
+       s.avg_monthly_ride_volume,
+       d.total_rides - d.trend_ - s.avg_monthly_ride_volume as residual,
+       d.trend_ + avg_monthly_ride_volume as expected
+FROM detrended d
+LEFT JOIN seasonality s ON EXTRACT(MONTH FROM d.day) = s.month_;
