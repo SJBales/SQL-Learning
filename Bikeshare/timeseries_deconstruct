@@ -1,3 +1,4 @@
+-- Calculating ride volume
 WITH ride_volume AS (SELECT DATE(start_time) AS day,
        end_station_name,
        COUNT(*) AS total_rides
@@ -24,19 +25,44 @@ detrended AS (
 ),
 
 -- getting monthly seasonality
-seasonality AS (
+monthly_seasonality AS (
   SELECT EXTRACT(MONTH FROM day) AS month_,
+         end_station_name,
   AVG(total_rides) AS avg_monthly_ride_volume
   FROM ride_volume
-  GROUP BY month_
-)
+  GROUP BY end_station_name, month_
+),
 
-SELECT d.day,
+-- calculating weekday seasonality
+weekday_seasonality AS (
+  SELECT EXTRACT(DAYOFWEEK FROM day) AS dow_,
+         end_station_name,
+         AVG(total_rides) AS dow_avg_rides
+  FROM ride_volume
+  GROUP BY end_station_name, dow_
+),
+
+-- Merging and calculating key values
+summary_values AS (SELECT d.day,
        d.end_station_name,
        d.total_rides,
-       d.trend_,
-       s.avg_monthly_ride_volume,
-       d.total_rides - d.trend_ - s.avg_monthly_ride_volume as residual,
-       d.trend_ + avg_monthly_ride_volume as expected
+       ROUND(d.trend_, 1) as moving_avg_7d,
+       -- Calculating key values for monthly seasonality adjustments
+       ROUND(s.avg_monthly_ride_volume, 1) AS monthly_volume,
+       ROUND(d.total_rides - d.trend_ - s.avg_monthly_ride_volume, 1) AS monthly_residual,
+       ROUND(d.trend_ + s.avg_monthly_ride_volume, 1) AS monthly_expected,
+       -- Calculating key values for weekday seasonality adjustments
+       ROUND(w.dow_avg_rides, 1) AS weekday_volume,
+       ROUND(d.total_rides - d.trend_ - w.dow_avg_rides, 1) AS dow_residual,
+       ROUND(d.trend_ + w.dow_avg_rides, 1) AS weekday_expected
 FROM detrended d
-LEFT JOIN seasonality s ON EXTRACT(MONTH FROM d.day) = s.month_;
+LEFT JOIN monthly_seasonality s ON EXTRACT(MONTH FROM d.day) = s.month_ AND d.end_station_name = s.end_station_name
+LEFT JOIN weekday_seasonality w ON EXTRACT(DAYOFWEEK FROM d.day) = w.dow_ AND d.end_station_name = w.end_station_name
+ORDER BY end_station_name, day)
+
+-- Looking at sum of squared residuals to determine which approach is more accurate
+SELECT ROUND(AVG(POWER(monthly_residual, 2)), 2) AS monthly_mse,
+       ROUND(AVG(POWER(dow_residual, 2)), 2) AS dow_mse,
+       ROUND(AVG(ABS(monthly_residual)), 2) AS monthly_mase,
+       ROUND(AVG(ABS(dow_residual)), 2) AS monthly_dow
+FROM summary_values;
