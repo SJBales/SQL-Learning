@@ -1,0 +1,13 @@
+-- Setting up a CTE to calculate the number of daily purchases
+WITH daily_purchases AS (SELECT CAST(event_date AS DATE) AS event_date,
+       COUNT(*) AS total_purchases
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name = 'purchase'
+      --AND _TABLE_SUFFIX = '20201101'
+GROUP BY event_date
+ORDER BY event_date)
+
+-- Writing a query to calculate week over week purchases (needs fixed)
+SELECT event_date,
+       total_purchases - LAG(total_purchases, 7) OVER(ORDER BY EXTRACT(ISODAY FROM event_date))
+FROM daily_purchases
