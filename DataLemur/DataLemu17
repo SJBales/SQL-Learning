@@ -1,0 +1,6 @@
+SELECT app_id,
+       ROUND((SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END)::DECIMAL / 
+               SUM(CASE WHEN event_type = 'impression' THEN 1 ELSE 0 END)::DECIMAL) * 100, 2) AS ctr
+FROM events
+WHERE EXTRACT(YEAR FROM "timestamp") = 2022
+GROUP BY app_id;
