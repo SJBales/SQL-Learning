@@ -1,0 +1,37 @@
+-- Starting the recursive chain with a count of rides by day
+WITH RECURSIVE total_rides AS (
+  SELECT DATE(start_date) as start_date,
+       COUNT(*) AS total_rides
+FROM `bigquery-public-data.san_francisco_bikeshare.bikeshare_trips`
+GROUP BY DATE(start_date)
+LIMIT 1000),
+
+-- Adding row numbers to my working table
+row_nums AS (
+  SELECT *,
+       ROW_NUMBER() OVER(ORDER BY start_date) as rn
+FROM total_rides),
+
+-- Calculating the ema
+ema AS (
+  SELECT start_date,
+         total_rides,
+         total_rides * 1.0 as ema,
+         rn
+  FROM row_nums
+  WHERE rn = 1
+
+  UNION ALL
+
+  SELECT o.start_date,
+         o.total_rides,
+         (o.total_rides * 0.2) + (0.8 * e.ema) as ema,
+         o.rn
+  FROM row_nums o
+  JOIN ema e ON o.rn = e.rn + 1
+)
+
+-- Final select statement
+SELECT *
+FROM ema
+ORDER BY start_date;
