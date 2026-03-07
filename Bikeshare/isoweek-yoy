@@ -12,7 +12,10 @@ SELECT y2018.isoweek_,
        y2019.isoday_,
        y2018.total_trips AS y2018_total_trips,
        y2019.total_trips AS y2019_total_trips,
-       ROUND(((y2019.total_trips - y2018.total_trips) * 1.0 / y2018.total_trips) * 100, 2) AS pct_change
+       CASE 
+          WHEN y2018.total_trips = 0 THEN NULL
+          ELSE ROUND(((y2019.total_trips - y2018.total_trips) * 1.0 / y2018.total_trips) * 100, 2) 
+          END AS yoy_pct_change
 FROM (SELECT * FROM iso_totals WHERE year_ = 2018) AS y2018
-LEFT JOIN (SELECT * FROM iso_totals WHERE year_ = 2019) AS y2019 
+FULL JOIN (SELECT * FROM iso_totals WHERE year_ = 2019) AS y2019 
 ON (y2018.year_ + 1) = y2019.year_ AND y2018.isoweek_ = y2019.isoweek_ AND y2018.isoday_ = y2019.isoday_
