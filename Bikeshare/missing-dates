@@ -1,0 +1,31 @@
+-- Generating the data spine
+WITH spine AS (
+  SELECT date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '2014-01-01', DATE '2014-12-31')) AS date
+),
+
+missing AS (
+  SELECT *
+  FROM `bigquery-public-data.austin_bikeshare.bikeshare_trips_daily_counts`
+  WHERE trip_date NOT IN  ('2014-01-10', 
+                            '2014-01-12')
+
+),
+
+-- Left joining against the spine to only get rides from 2014
+safe_data AS (
+  SELECT date,
+  COALESCE(trip_count, 0) AS trip_count
+FROM spine 
+LEFT JOIN missing rides
+ON spine.date = rides.trip_date
+ORDER BY date
+)
+
+-- Final Agg
+SELECT *,
+       SUM(trip_count) OVER(
+        ORDER BY date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS total_trips,
+       SUM(CASE WHEN trip_count = 0 THEN 1 ELSE 0 END) OVER() AS gaps_filled
+FROM safe_data;
