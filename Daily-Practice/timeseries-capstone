@@ -1,0 +1,22 @@
+-- Finding the total number of daily checkouts
+WITH daily_checkouts AS (
+  SELECT PARSE_DATE('%Y%m%d', event_date) AS event_date,
+       EXTRACT(DAYOFWEEK FROM PARSE_DATE('%Y%m%d', event_date)) AS dow,
+       SUM(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) as checkouts
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY event_date, dow)
+
+
+-- Calculating the trend
+SELECT event_date,
+       dow,
+       AVG(checkouts) 
+          OVER(ORDER BY event_date
+               ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) AS trend
+FROM daily_checkouts
+
+-- Next calculate detrended values
+
+-- Calculate seasonality
+
+-- Put it all together
