@@ -36,5 +36,42 @@ LEFT JOIN trend t ON d.event_date = t.event_date
 LEFT JOIN daily_seasonality s ON d.dow = s.dow;
 
 /*
-Next build an EMA using a recursive CTE
+Building a recursive CTE to calculate the EMA
 */
+
+-- Building a recursive CTE on daily checkout volume
+WITH RECURSIVE daily_checkouts2 AS (
+  SELECT PARSE_DATE('%Y%m%d', event_date) AS event_date,
+         EXTRACT(DAYOFWEEK FROM PARSE_DATE('%Y%m%d', event_date)) AS dow,
+         SUM(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS checkouts
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  GROUP BY event_date, dow
+),
+
+-- Adding the Row Number
+daily_checkouts_rn AS (
+  SELECT *,
+         ROW_NUMBER() OVER (ORDER BY event_date) AS rn
+  FROM daily_checkouts2
+),
+
+-- Setting up the actual recursion to handle the EMA
+ema AS (
+  SELECT fr.event_date,
+         fr.checkouts,
+         CAST(fr.checkouts AS FLOAT64) AS ema7
+  FROM daily_checkouts_rn fr
+  WHERE fr.rn = 1
+
+  UNION ALL
+
+  SELECT cur.event_date,
+         cur.checkouts,
+         (0.2 * cur.checkouts) + (0.8 * prev.ema7) AS ema7
+  FROM daily_checkouts_rn cur
+  INNER JOIN ema prev ON cur.event_date = prev.event_date + 1
+)
+
+-- Inspecting the results of the recursion
+SELECT *
+FROM ema;
