@@ -1,0 +1,24 @@
+/*
+Spinning up a script to take a look at auto correlations.
+*/
+
+-- Finding the total number of daily checkouts
+WITH daily_checkouts AS (
+  SELECT PARSE_DATE('%Y%m%d', event_date) AS event_date,
+       EXTRACT(DAYOFWEEK FROM PARSE_DATE('%Y%m%d', event_date)) AS dow,
+       SUM(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) as checkouts
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY event_date, dow),
+
+-- Calculating lags
+lags AS (SELECT event_date,
+         dow,
+         checkouts,
+         LAG(checkouts, 7) OVER(ORDER BY event_date) AS week_lag,
+         LAG(checkouts, 28) OVER(ORDER BY event_date) AS month_lag
+FROM daily_checkouts)
+
+-- Calculating autocorrelations
+SELECT CORR(checkouts, week_lag) AS weekly_acf,
+       CORR(checkouts, month_lag) AS month_acf
+FROM lags;
