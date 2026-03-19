@@ -1,0 +1,14 @@
+-- CTE for transaction counts
+WITH transaction_counts AS (SELECT user_id,
+       transaction_date,
+       COUNT(*) AS total_products,
+       ROW_NUMBER() OVER(PARTITION BY user_id
+                         ORDER BY transaction_date DESC) AS transaction_order
+FROM user_transactions
+GROUP BY user_id, transaction_date)
+
+-- Query to return results
+SELECT transaction_date, user_id, total_products
+FROM transaction_counts
+WHERE transaction_order = 1
+ORDER BY transaction_date;
