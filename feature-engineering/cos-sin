@@ -1,0 +1,8 @@
+SELECT 
+  TIMESTAMP_TRUNC(TIMESTAMP_MICROS(event_timestamp), HOUR) AS hour_bucket,
+  COUNT(*) AS total_traffic,
+  SIN(2 * ACOS(-1) * EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp)) / 24) AS sin_trans,
+  COS(2 * ACOS(-1) * EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp)) / 24) AS cos_trans
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY hour_bucket, sin_trans, cos_trans
+ORDER BY hour_bucket
