@@ -1,0 +1,17 @@
+-- First approach with a window function, not the most efficient
+WITH ranks AS (SELECT *,
+       RANK() OVER(ORDER BY order_occurrences DESC) AS occurrence_rank
+FROM items_per_order)
+
+SELECT item_count AS "mode"
+FROM ranks
+WHERE occurrence_rank = 1
+ORDER BY item_count
+
+-- Approach #2 just using max (this is cleaner)
+SELECT item_count
+FROM items_per_order
+WHERE order_occurrences = (
+      SELECT MAX(order_occurrences) 
+      FROM items_per_order)
+ORDER BY item_count;
