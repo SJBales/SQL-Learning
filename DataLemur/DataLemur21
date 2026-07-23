@@ -14,3 +14,21 @@ SELECT card_name, issued_amount
 FROM first_month_cte
 WHERE first_month = True
 ORDER BY issued_amount DESC;
+
+/* 
+The more robust approach is to convert the date to a datetime object instead of keying off year and month
+*/
+
+WITH card_launch AS 
+(SELECT card_name,
+       issued_amount,
+       MAKE_DATE(issue_year, issue_month, 1) AS date_col,
+       MIN(MAKE_DATE(issue_year, issue_month, 1)) 
+        OVER(PARTITION BY card_name) AS launch_date
+FROM monthly_cards_issued)
+
+SELECT card_name,
+       issued_amount
+FROM card_launch
+WHERE date_col = launch_date
+ORDER BY issued_amount DESC;
