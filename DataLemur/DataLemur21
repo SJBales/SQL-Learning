@@ -1,3 +1,6 @@
+/*
+Using a window function in a CTE to find the first month of card release volume
+*/
 WITH first_month_cte AS (SELECT issue_month,
        issue_year,
        card_name,
